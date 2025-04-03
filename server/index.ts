@@ -169,23 +169,51 @@ io.on('connection', (socket) => {
 // Start server with error handling
 let currentPort = PORT;
 const MAX_PORT_ATTEMPTS = 10;
+let serverInstance: ReturnType<typeof httpServer.listen> | null = null;
 
 const startServer = (port: number) => {
-  if (httpServer.listening) {
-    httpServer.close();
+  // Close existing server if it exists
+  if (serverInstance) {
+    serverInstance.close();
+    serverInstance = null;
   }
   
-  httpServer.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  }).on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
-      currentPort++;
-      console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
-      startServer(currentPort);
-    } else {
-      console.error('Server error:', err);
-    }
-  });
+  try {
+    serverInstance = httpServer.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    }).on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
+        currentPort++;
+        console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
+        startServer(currentPort);
+      } else {
+        console.error('Server error:', err);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+  }
 };
+
+// Handle process termination
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  }
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received. Shutting down gracefully...');
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  }
+});
 
 startServer(currentPort); 

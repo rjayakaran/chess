@@ -40,4 +40,5 @@ jobs:
           npm start
         env:
           NODE_ENV: production
-          PORT: 3001 
+          PORT: 3001
+        timeout-minutes: 5 
