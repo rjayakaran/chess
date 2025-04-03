@@ -1,5 +1,5 @@
 import express from 'express';
-import { Server as HttpServer } from 'http';
+import { createServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import { Chess } from 'chess.js';
 import cors from 'cors';
@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 3001;
 const MAX_PORT_ATTEMPTS = 8;
 let currentPort: number = parseInt(PORT as string);
-let serverInstance: HttpServer | null = null;
+let serverInstance: ReturnType<typeof createServer> | null = null;
 let io: SocketServer | null = null;
 
 // In-memory game state
@@ -90,17 +90,22 @@ app.post('/api/player', (req, res) => {
   }
 });
 
-const startServer = (port: number) => {
+function startServer(port: number) {
   try {
-    // Create HTTP server instance
-    serverInstance = new HttpServer(app);
-    
-    // Initialize Socket.IO
+    if (serverInstance) {
+      serverInstance.close();
+    }
+
+    serverInstance = createServer(app);
     io = new SocketServer(serverInstance, {
       cors: {
         origin: "*",
         methods: ["GET", "POST"]
       }
+    });
+
+    serverInstance.listen(port, () => {
+      console.log(`Server running on port ${port}`);
     });
 
     // Socket.io connection handling
@@ -235,7 +240,7 @@ const startServer = (port: number) => {
         });
       });
 
-      socket.on('resign', ({ player, gameId }) => {
+      socket.on('resign', ({ player, gameId }: { player: string; gameId: string }) => {
         console.log('Player resigned:', player);
         const game = games.get(gameId);
         if (!game) return;
@@ -247,22 +252,16 @@ const startServer = (port: number) => {
         console.log('Client disconnected');
       });
     });
-
-    // Start listening on the port
-    serverInstance.listen(port, () => {
-      console.log(`Server is running on port ${port}`);
-    });
   } catch (error) {
-    console.error(`Failed to start server on port ${port}:`, error);
-    if (port < currentPort + MAX_PORT_ATTEMPTS) {
-      console.log(`Attempting to start on next port: ${port + 1}`);
+    console.error(`Error starting server on port ${port}:`, error);
+    if (port < 3008) {
+      console.log(`Trying next port: ${port + 1}`);
       startServer(port + 1);
     } else {
-      console.error('Max port attempts reached. Server failed to start.');
-      process.exit(1);
+      console.error('Failed to start server after multiple attempts');
     }
   }
-};
+}
 
 // Handle server shutdown
 process.on('SIGTERM', () => {

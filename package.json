@@ -11,11 +11,12 @@
     "start": "concurrently \"npm run preview\" \"cd server && npm start\""
   },
   "dependencies": {
+    "@types/react-router-dom": "^5.3.3",
     "chess.js": "^1.0.0-beta.5",
     "react": "^18.2.0",
     "react-chessboard": "^2.1.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.1",
+    "react-router-dom": "^6.30.0",
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
