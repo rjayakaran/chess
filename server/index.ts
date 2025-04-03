@@ -168,9 +168,19 @@ io.on('connection', (socket) => {
         const nextTurn = chess.turn() === 'w' ? 'white' : 'black';
         const nextPlayer = nextTurn === 'white' ? game.whitePlayer : game.blackPlayer;
         
-        console.log('Next turn:', nextTurn, 'Next player:', nextPlayer);
-        console.log('Current game state - White:', game.whitePlayer, 'Black:', game.blackPlayer);
-
+        // Check for game over conditions
+        const isGameOver = chess.isGameOver();
+        const isCheckmate = chess.isCheckmate();
+        const isDraw = chess.isDraw();
+        
+        console.log('Game state:', {
+          isGameOver,
+          isCheckmate,
+          isDraw,
+          nextTurn,
+          nextPlayer
+        });
+        
         // Save the updated game state
         games.set(gameId, game);
 
@@ -179,10 +189,10 @@ io.on('connection', (socket) => {
           turn: nextTurn,
           whitePlayer: game.whitePlayer,
           blackPlayer: game.blackPlayer,
-          gameOver: chess.isGameOver(),
-          winner: chess.isGameOver() ? player : null,
+          gameOver: isGameOver,
+          winner: isCheckmate ? player : null,
           moveHistory: chess.history(),
-          currentPlayer: nextPlayer
+          currentPlayer: isGameOver ? null : nextPlayer
         });
       } else {
         console.log('Invalid move');
