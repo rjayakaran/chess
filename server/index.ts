@@ -6,19 +6,25 @@ import cors from 'cors';
 
 const app = express();
 const httpServer = createServer(app);
+
+// Get port from environment variable or use 3001 as default
+const PORT = parseInt(process.env.PORT || '3001', 10);
+
+// Configure CORS based on environment
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://rjayakaran.github.io'] // Your GitHub Pages URL
+    : 'http://localhost:5173',
+  methods: ['GET', 'POST'],
+  credentials: true
+};
+
 const io = new Server(httpServer, {
-  cors: {
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST'],
-    credentials: true
-  },
+  cors: corsOptions
 });
 
 // Enable CORS for all routes
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true
-}));
+app.use(cors(corsOptions));
 
 // Parse JSON bodies
 app.use(express.json());
@@ -160,7 +166,22 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-}); 
+// Start server with error handling
+let currentPort = PORT;
+const MAX_PORT_ATTEMPTS = 10;
+
+const startServer = (port: number) => {
+  httpServer.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  }).on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
+      currentPort++;
+      console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
+      startServer(currentPort);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+};
+
+startServer(currentPort); 

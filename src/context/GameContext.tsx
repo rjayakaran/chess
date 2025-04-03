@@ -22,26 +22,32 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const authenticate = useCallback(async (passcode: string) => {
     try {
-      console.log('Attempting authentication with passcode:', passcode); // Debug log
-      const response = await fetch('http://localhost:3001/api/auth', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ passcode }),
-        credentials: 'include',
-      });
+      console.log('Attempting authentication with passcode:', passcode);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ passcode }),
+          credentials: 'include',
+        }
+      );
       
-      console.log('Authentication response:', response); // Debug log
+      console.log('Authentication response:', response);
       const data = await response.json();
-      console.log('Authentication data:', data); // Debug log
+      console.log('Authentication data:', data);
       
       if (data.success) {
         setIsAuthenticated(true);
-        const newSocket = io('http://localhost:3001', {
-          withCredentials: true
-        });
+        const newSocket = io(
+          import.meta.env.VITE_API_URL || 'http://localhost:3001',
+          {
+            withCredentials: true
+          }
+        );
         setSocket(newSocket);
       }
       return data;
@@ -55,15 +61,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!socket) return false;
     
     try {
-      const response = await fetch('http://localhost:3001/api/player', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ identity }),
-        credentials: 'include',
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/player`,
+        {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ identity }),
+          credentials: 'include',
+        }
+      );
       const data = await response.json();
       
       if (data.success) {
@@ -73,10 +82,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           token: data.token,
         });
         
-        // Emit select_player event to server
         socket.emit('select_player', {
           player: identity,
-          gameId: 'default-game', // Using a default game ID for now
+          gameId: 'default-game',
         });
         
         return true;
