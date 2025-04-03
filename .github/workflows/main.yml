@@ -1,0 +1,48 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install Dependencies
+      run: |
+        npm install
+        cd server && npm install && cd ..
+    
+    - name: Run Tests
+      run: |
+        npm test
+        cd server && npm test && cd ..
+    
+    - name: Build Frontend
+      run: npm run build
+    
+    - name: Build Backend
+      run: cd server && npm run build && cd ..
+    
+    - name: Upload Frontend Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: dist/
+    
+    - name: Upload Backend Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-build
+        path: server/dist/ 
