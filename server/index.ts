@@ -1,8 +1,11 @@
 import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
+import { Server as HttpServer } from 'http';
+import { Server as SocketServer, Socket } from 'socket.io';
 import { Chess } from 'chess.js';
 import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -13,18 +16,11 @@ app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Chess server is running' });
 });
 
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: "*", // Allow all origins in development
-    methods: ["GET", "POST"]
-  }
-});
-
-// Get port from environment variable or use 3001 as default
-const PORT = parseInt(process.env.PORT || '3001', 10);
-const MAX_PORT_ATTEMPTS = 10;
-let currentPort: number = PORT;
+const PORT = process.env.PORT || 3001;
+const MAX_PORT_ATTEMPTS = 8;
+let currentPort: number = parseInt(PORT as string);
+let serverInstance: HttpServer | null = null;
+let io: SocketServer | null = null;
 
 // In-memory game state
 const games = new Map<string, {
@@ -94,162 +90,176 @@ app.post('/api/player', (req, res) => {
   }
 });
 
-// Socket.io connection handling
-io.on('connection', (socket) => {
-  console.log('Client connected');
-
-  socket.on('select_player', ({ player, gameId }) => {
-    console.log('Player selected:', player, 'for game:', gameId);
-    const game = games.get(gameId) || {
-      chess: new Chess(),
-      whitePlayer: null,
-      blackPlayer: null,
-      selectedColor: null
-    };
-
-    // If OJ is white, RJ should be black and vice versa
-    if (player === 'OJ') {
-      if (!game.whitePlayer && !game.blackPlayer) {
-        game.whitePlayer = player;
-        game.blackPlayer = 'RJ';  // Automatically assign RJ as black
-        console.log('Assigned white to OJ and black to RJ');
-      } else if (!game.blackPlayer) {
-        game.blackPlayer = player;
-        game.whitePlayer = 'RJ';  // Automatically assign RJ as white
-        console.log('Assigned black to OJ and white to RJ');
-      }
-    } else if (player === 'RJ') {
-      if (!game.whitePlayer && !game.blackPlayer) {
-        game.whitePlayer = player;
-        game.blackPlayer = 'OJ';  // Automatically assign OJ as black
-        console.log('Assigned white to RJ and black to OJ');
-      } else if (!game.blackPlayer) {
-        game.blackPlayer = player;
-        game.whitePlayer = 'OJ';  // Automatically assign OJ as white
-        console.log('Assigned black to RJ and white to OJ');
-      }
-    }
-
-    // Save the updated game state
-    games.set(gameId, game);
-    
-    // Send game state to all clients
-    io.emit('game_update', {
-      board: game.chess.fen(),
-      turn: game.chess.turn() === 'w' ? 'white' : 'black',
-      whitePlayer: game.whitePlayer,
-      blackPlayer: game.blackPlayer,
-      gameOver: false,
-      winner: null,
-      moveHistory: game.chess.history(),
-      currentPlayer: game.chess.turn() === 'w' ? game.whitePlayer : game.blackPlayer
-    });
-  });
-
-  socket.on('make_move', ({ move, player, gameId }) => {
-    console.log('Move attempted:', move, 'by player:', player, 'in game:', gameId);
-    const game = games.get(gameId);
-    if (!game) {
-      console.log('Game not found:', gameId);
-      return;
-    }
-
-    try {
-      const chess = game.chess;
-      const result = chess.move(move);
-
-      if (result) {
-        console.log('Move successful:', result.san);
-        
-        // Determine whose turn it is next
-        const nextTurn = chess.turn() === 'w' ? 'white' : 'black';
-        const nextPlayer = nextTurn === 'white' ? game.whitePlayer : game.blackPlayer;
-        
-        // Check for game over conditions
-        const isGameOver = chess.isGameOver();
-        const isCheckmate = chess.isCheckmate();
-        const isDraw = chess.isDraw();
-        
-        console.log('Game state:', {
-          isGameOver,
-          isCheckmate,
-          isDraw,
-          nextTurn,
-          nextPlayer
-        });
-        
-        // Save the updated game state
-        games.set(gameId, game);
-
-        io.emit('game_update', {
-          board: chess.fen(),
-          turn: nextTurn,
-          whitePlayer: game.whitePlayer,
-          blackPlayer: game.blackPlayer,
-          gameOver: isGameOver,
-          winner: isCheckmate ? player : null,
-          moveHistory: chess.history(),
-          currentPlayer: isGameOver ? null : nextPlayer
-        });
-      } else {
-        console.log('Invalid move');
-      }
-    } catch (error) {
-      console.error('Move error:', error);
-    }
-  });
-
-  socket.on('new_game', ({ player, gameId }) => {
-    console.log('New game requested by:', player);
-    const existingGame = games.get(gameId);
-    const game = {
-      chess: new Chess(),
-      whitePlayer: existingGame?.whitePlayer || null,
-      blackPlayer: existingGame?.blackPlayer || null,
-      selectedColor: null
-    };
-    games.set(gameId, game);
-
-    io.emit('game_update', {
-      board: game.chess.fen(),
-      turn: 'white',
-      whitePlayer: game.whitePlayer,
-      blackPlayer: game.blackPlayer,
-      gameOver: false,
-      winner: null,
-      moveHistory: [],
-      currentPlayer: game.whitePlayer
-    });
-  });
-
-  socket.on('resign', ({ player, gameId }) => {
-    console.log('Player resigned:', player);
-    const game = games.get(gameId);
-    if (!game) return;
-
-    io.emit('game_over', player === game.whitePlayer ? game.blackPlayer : game.whitePlayer);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
-});
-
-// Start server with error handling
-let serverInstance: ReturnType<typeof httpServer.listen> | null = null;
-
 const startServer = (port: number) => {
   try {
-    httpServer.listen(port, () => {
-      console.log(`Server running on port ${port}`);
+    // Create HTTP server instance
+    serverInstance = new HttpServer(app);
+    
+    // Initialize Socket.IO
+    io = new SocketServer(serverInstance, {
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+      }
     });
-  } catch (err: any) {
-    if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
-      currentPort++;
-      console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
-      startServer(currentPort);
+
+    // Socket.io connection handling
+    io.on('connection', (socket: Socket) => {
+      console.log('Client connected');
+
+      socket.on('authenticate', (passcode: string) => {
+        // ... existing code ...
+      });
+
+      socket.on('select_player', (data: { player: string; gameId: string }) => {
+        console.log('Player selected:', data.player, 'for game:', data.gameId);
+        const game = games.get(data.gameId) || {
+          chess: new Chess(),
+          whitePlayer: null,
+          blackPlayer: null,
+          selectedColor: null
+        };
+
+        // If OJ is white, RJ should be black and vice versa
+        if (data.player === 'OJ') {
+          if (!game.whitePlayer && !game.blackPlayer) {
+            game.whitePlayer = data.player;
+            game.blackPlayer = 'RJ';  // Automatically assign RJ as black
+            console.log('Assigned white to OJ and black to RJ');
+          } else if (!game.blackPlayer) {
+            game.blackPlayer = data.player;
+            game.whitePlayer = 'RJ';  // Automatically assign RJ as white
+            console.log('Assigned black to OJ and white to RJ');
+          }
+        } else if (data.player === 'RJ') {
+          if (!game.whitePlayer && !game.blackPlayer) {
+            game.whitePlayer = data.player;
+            game.blackPlayer = 'OJ';  // Automatically assign OJ as black
+            console.log('Assigned white to RJ and black to OJ');
+          } else if (!game.blackPlayer) {
+            game.blackPlayer = data.player;
+            game.whitePlayer = 'OJ';  // Automatically assign OJ as white
+            console.log('Assigned black to RJ and white to OJ');
+          }
+        }
+
+        // Save the updated game state
+        games.set(data.gameId, game);
+        
+        // Send game state to all clients
+        io?.emit('game_update', {
+          board: game.chess.fen(),
+          turn: game.chess.turn() === 'w' ? 'white' : 'black',
+          whitePlayer: game.whitePlayer,
+          blackPlayer: game.blackPlayer,
+          gameOver: false,
+          winner: null,
+          moveHistory: game.chess.history(),
+          currentPlayer: game.chess.turn() === 'w' ? game.whitePlayer : game.blackPlayer
+        });
+      });
+
+      socket.on('make_move', (data: { move: string; player: string; gameId: string }) => {
+        console.log('Move attempted:', data.move, 'by player:', data.player, 'in game:', data.gameId);
+        const game = games.get(data.gameId);
+        if (!game) {
+          console.log('Game not found:', data.gameId);
+          return;
+        }
+
+        try {
+          const chess = game.chess;
+          const result = chess.move(data.move);
+
+          if (result) {
+            console.log('Move successful:', result.san);
+            
+            // Determine whose turn it is next
+            const nextTurn = chess.turn() === 'w' ? 'white' : 'black';
+            const nextPlayer = nextTurn === 'white' ? game.whitePlayer : game.blackPlayer;
+            
+            // Check for game over conditions
+            const isGameOver = chess.isGameOver();
+            const isCheckmate = chess.isCheckmate();
+            const isDraw = chess.isDraw();
+            
+            console.log('Game state:', {
+              isGameOver,
+              isCheckmate,
+              isDraw,
+              nextTurn,
+              nextPlayer
+            });
+            
+            // Save the updated game state
+            games.set(data.gameId, game);
+
+            io?.emit('game_update', {
+              board: chess.fen(),
+              turn: nextTurn,
+              whitePlayer: game.whitePlayer,
+              blackPlayer: game.blackPlayer,
+              gameOver: isGameOver,
+              winner: isCheckmate ? data.player : null,
+              moveHistory: chess.history(),
+              currentPlayer: isGameOver ? null : nextPlayer
+            });
+          } else {
+            console.log('Invalid move');
+          }
+        } catch (error) {
+          console.error('Move error:', error);
+        }
+      });
+
+      socket.on('request_new_game', (data: { player: string; gameId: string }) => {
+        console.log('New game requested by:', data.player);
+        const existingGame = games.get(data.gameId);
+        const game = {
+          chess: new Chess(),
+          whitePlayer: existingGame?.whitePlayer || null,
+          blackPlayer: existingGame?.blackPlayer || null,
+          selectedColor: null
+        };
+        games.set(data.gameId, game);
+
+        io?.emit('game_update', {
+          board: game.chess.fen(),
+          turn: 'white',
+          whitePlayer: game.whitePlayer,
+          blackPlayer: game.blackPlayer,
+          gameOver: false,
+          winner: null,
+          moveHistory: [],
+          currentPlayer: game.whitePlayer
+        });
+      });
+
+      socket.on('resign', ({ player, gameId }) => {
+        console.log('Player resigned:', player);
+        const game = games.get(gameId);
+        if (!game) return;
+
+        io?.emit('game_over', player === game.whitePlayer ? game.blackPlayer : game.whitePlayer);
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Client disconnected');
+      });
+    });
+
+    // Start listening on the port
+    serverInstance.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
+  } catch (error) {
+    console.error(`Failed to start server on port ${port}:`, error);
+    if (port < currentPort + MAX_PORT_ATTEMPTS) {
+      console.log(`Attempting to start on next port: ${port + 1}`);
+      startServer(port + 1);
     } else {
-      console.error('Failed to start server:', err);
+      console.error('Max port attempts reached. Server failed to start.');
+      process.exit(1);
     }
   }
 };
