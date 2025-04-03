@@ -17,6 +17,6 @@ guessImports = true
 enabledForHosting = false
 
 [deployment]
-build = ["npm", "install"]
+build = ["npm", "install", "-g", "concurrently"]
 run = ["npm", "start"]
 deploymentTarget = "cloudrun" 
