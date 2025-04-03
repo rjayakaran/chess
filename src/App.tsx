@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GameProvider } from './context/GameContext';
 import { LoginPage } from './pages/LoginPage';
@@ -44,7 +44,7 @@ const AppContent = () => {
 function App() {
   return (
     <GameProvider>
-      <Router basename="/chess">
+      <Router>
         <AppContent />
       </Router>
     </GameProvider>

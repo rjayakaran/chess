@@ -33,7 +33,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             'Accept': 'application/json',
           },
           body: JSON.stringify({ passcode }),
-          credentials: 'include',
+
         }
       );
       
@@ -43,8 +43,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (data.success) {
         setIsAuthenticated(true);
-        const newSocket = io(import.meta.env.VITE_SERVER_URL || 'http://localhost:3001', {
-          autoConnect: false
+        const newSocket = io('http://localhost:3001', {
+          transports: ['websocket'],
+          autoConnect: true
         });
         setSocket(newSocket);
       }
@@ -68,7 +69,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             'Accept': 'application/json',
           },
           body: JSON.stringify({ identity, preferredColor }),
-          credentials: 'include',
+
         }
       );
       const data = await response.json();

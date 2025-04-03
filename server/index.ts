@@ -8,7 +8,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Add root endpoint handler
@@ -111,6 +114,28 @@ function startServer(port: number) {
     // Socket.io connection handling
     io.on('connection', (socket: Socket) => {
       console.log('Client connected');
+
+      // Initialize game state for new connections
+      const gameId = 'default-game';
+      const game = games.get(gameId) || {
+        chess: new Chess(),
+        whitePlayer: null,
+        blackPlayer: null,
+        selectedColor: null
+      };
+      games.set(gameId, game);
+
+      // Send initial game state to the new client
+      socket.emit('game_update', {
+        board: game.chess.fen(),
+        turn: game.chess.turn() === 'w' ? 'white' : 'black',
+        whitePlayer: game.whitePlayer,
+        blackPlayer: game.blackPlayer,
+        gameOver: false,
+        winner: null,
+        moveHistory: game.chess.history(),
+        currentPlayer: game.chess.turn() === 'w' ? game.whitePlayer : game.blackPlayer
+      });
 
       socket.on('authenticate', (passcode: string) => {
         // ... existing code ...
