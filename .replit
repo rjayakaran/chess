@@ -18,5 +18,5 @@ enabledForHosting = false
 
 [deployment]
 build = ["npm", "install", "-g", "concurrently"]
-run = ["npm", "start"]
+run = ["npm", "run", "build"]
 deploymentTarget = "cloudrun" 

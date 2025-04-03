@@ -24,7 +24,7 @@ const io = new Server(httpServer, {
 // Get port from environment variable or use 3001 as default
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const MAX_PORT_ATTEMPTS = 10;
-let currentPort = PORT;
+let currentPort: number = PORT;
 
 // In-memory game state
 const games = new Map<string, {
@@ -238,33 +238,19 @@ io.on('connection', (socket) => {
 // Start server with error handling
 let serverInstance: ReturnType<typeof httpServer.listen> | null = null;
 
-const startServer = async (port: number) => {
+const startServer = (port: number) => {
   try {
-    // Close existing server if it exists
-    if (serverInstance) {
-      await new Promise<void>((resolve) => {
-        serverInstance!.close(() => {
-          console.log(`Closed server on port ${port}`);
-          serverInstance = null;
-          resolve();
-        });
-      });
-    }
-
-    // Start new server
-    serverInstance = httpServer.listen(port, () => {
+    httpServer.listen(port, () => {
       console.log(`Server running on port ${port}`);
-    }).on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
-        currentPort++;
-        console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
-        startServer(currentPort);
-      } else {
-        console.error('Server error:', err);
-      }
     });
-  } catch (error) {
-    console.error('Failed to start server:', error);
+  } catch (err: any) {
+    if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
+      currentPort++;
+      console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
+      startServer(currentPort);
+    } else {
+      console.error('Failed to start server:', err);
+    }
   }
 };
 
