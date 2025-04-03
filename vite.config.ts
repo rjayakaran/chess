@@ -7,7 +7,11 @@ export default defineConfig({
   base: '/chess/', // This is your repository name
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: false, // Allow Vite to find an available port
+    hmr: {
+      port: 5173,
+      protocol: 'ws',
+    },
   },
   build: {
     outDir: 'dist',

@@ -172,27 +172,41 @@ const MAX_PORT_ATTEMPTS = 10;
 let serverInstance: ReturnType<typeof httpServer.listen> | null = null;
 
 const startServer = (port: number) => {
-  // Close existing server if it exists
-  if (serverInstance) {
-    serverInstance.close();
-    serverInstance = null;
-  }
-  
-  try {
-    serverInstance = httpServer.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-    }).on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
-        currentPort++;
-        console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
-        startServer(currentPort);
-      } else {
-        console.error('Server error:', err);
-      }
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-  }
+  return new Promise<void>((resolve, reject) => {
+    // Close existing server if it exists
+    if (serverInstance) {
+      serverInstance.close(() => {
+        console.log(`Closed server on port ${port}`);
+        serverInstance = null;
+        startNewServer(port).then(resolve).catch(reject);
+      });
+    } else {
+      startNewServer(port).then(resolve).catch(reject);
+    }
+  });
+};
+
+const startNewServer = (port: number) => {
+  return new Promise<void>((resolve, reject) => {
+    try {
+      serverInstance = httpServer.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+        resolve();
+      }).on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE' && currentPort < PORT + MAX_PORT_ATTEMPTS) {
+          currentPort++;
+          console.log(`Port ${port} is already in use. Trying port ${currentPort}`);
+          startServer(currentPort).then(resolve).catch(reject);
+        } else {
+          console.error('Server error:', err);
+          reject(err);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to start server:', error);
+      reject(error);
+    }
+  });
 };
 
 // Handle process termination
@@ -216,4 +230,8 @@ process.on('SIGINT', () => {
   }
 });
 
-startServer(currentPort); 
+// Start the server
+startServer(currentPort).catch(error => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
+}); 
