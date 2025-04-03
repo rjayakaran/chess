@@ -39,7 +39,7 @@ export const ChessboardComponent: React.FC = () => {
       <Chessboard
         position={gameState.board}
         onPieceDrop={onDrop}
-        boardWidth={400}
+        boardWidth={800}
         customBoardStyle={{
           borderRadius: '4px',
           boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',

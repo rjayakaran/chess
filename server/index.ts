@@ -14,7 +14,7 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://rjayakaran.github.io'] // Your GitHub Pages URL
-    : 'http://localhost:5173',
+    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Local development URLs
   methods: ['GET', 'POST'],
   credentials: true
 };
@@ -34,6 +34,7 @@ const games = new Map<string, {
   chess: Chess;
   whitePlayer: string | null;
   blackPlayer: string | null;
+  selectedColor: 'white' | 'black' | null;
 }>();
 
 // Authentication middleware
@@ -58,14 +59,42 @@ app.post('/api/auth', authenticate, (req, res) => {
 });
 
 app.post('/api/player', (req, res) => {
-  const { identity } = req.body;
+  const { identity, preferredColor } = req.body;
+  const game = games.get('default-game') || {
+    chess: new Chess(),
+    whitePlayer: null,
+    blackPlayer: null,
+    selectedColor: null,
+  };
   
-  // TODO: Implement proper player selection logic
-  res.json({
-    success: true,
-    color: Math.random() > 0.5 ? 'white' : 'black',
-    token: 'dummy-token',
-  });
+  // If OJ is selecting, they get to choose the color
+  if (identity === 'OJ' && preferredColor) {
+    game.selectedColor = preferredColor;
+    games.set('default-game', game);
+    res.json({
+      success: true,
+      color: preferredColor,
+      token: 'dummy-token',
+    });
+  } 
+  // If RJ is selecting, they get the opposite color of what OJ chose
+  else if (identity === 'RJ' && game.selectedColor) {
+    const color = game.selectedColor === 'white' ? 'black' : 'white';
+    res.json({
+      success: true,
+      color,
+      token: 'dummy-token',
+    });
+  }
+  // If no color is selected yet, assign randomly
+  else {
+    const color = Math.random() > 0.5 ? 'white' : 'black';
+    res.json({
+      success: true,
+      color,
+      token: 'dummy-token',
+    });
+  }
 });
 
 // Socket.io connection handling
@@ -78,16 +107,33 @@ io.on('connection', (socket) => {
       chess: new Chess(),
       whitePlayer: null,
       blackPlayer: null,
+      selectedColor: null
     };
 
-    if (!game.whitePlayer) {
-      game.whitePlayer = player;
-      console.log('Assigned white to:', player);
-    } else if (!game.blackPlayer) {
-      game.blackPlayer = player;
-      console.log('Assigned black to:', player);
+    // If OJ is white, RJ should be black and vice versa
+    if (player === 'OJ') {
+      if (!game.whitePlayer && !game.blackPlayer) {
+        game.whitePlayer = player;
+        game.blackPlayer = 'RJ';  // Automatically assign RJ as black
+        console.log('Assigned white to OJ and black to RJ');
+      } else if (!game.blackPlayer) {
+        game.blackPlayer = player;
+        game.whitePlayer = 'RJ';  // Automatically assign RJ as white
+        console.log('Assigned black to OJ and white to RJ');
+      }
+    } else if (player === 'RJ') {
+      if (!game.whitePlayer && !game.blackPlayer) {
+        game.whitePlayer = player;
+        game.blackPlayer = 'OJ';  // Automatically assign OJ as black
+        console.log('Assigned white to RJ and black to OJ');
+      } else if (!game.blackPlayer) {
+        game.blackPlayer = player;
+        game.whitePlayer = 'OJ';  // Automatically assign OJ as white
+        console.log('Assigned black to RJ and white to OJ');
+      }
     }
 
+    // Save the updated game state
     games.set(gameId, game);
     
     // Send game state to all clients
@@ -99,6 +145,7 @@ io.on('connection', (socket) => {
       gameOver: false,
       winner: null,
       moveHistory: game.chess.history(),
+      currentPlayer: game.chess.turn() === 'w' ? game.whitePlayer : game.blackPlayer
     });
   });
 
@@ -116,14 +163,26 @@ io.on('connection', (socket) => {
 
       if (result) {
         console.log('Move successful:', result.san);
+        
+        // Determine whose turn it is next
+        const nextTurn = chess.turn() === 'w' ? 'white' : 'black';
+        const nextPlayer = nextTurn === 'white' ? game.whitePlayer : game.blackPlayer;
+        
+        console.log('Next turn:', nextTurn, 'Next player:', nextPlayer);
+        console.log('Current game state - White:', game.whitePlayer, 'Black:', game.blackPlayer);
+
+        // Save the updated game state
+        games.set(gameId, game);
+
         io.emit('game_update', {
           board: chess.fen(),
-          turn: chess.turn() === 'w' ? 'white' : 'black',
+          turn: nextTurn,
           whitePlayer: game.whitePlayer,
           blackPlayer: game.blackPlayer,
           gameOver: chess.isGameOver(),
           winner: chess.isGameOver() ? player : null,
           moveHistory: chess.history(),
+          currentPlayer: nextPlayer
         });
       } else {
         console.log('Invalid move');
@@ -135,21 +194,24 @@ io.on('connection', (socket) => {
 
   socket.on('new_game', ({ player, gameId }) => {
     console.log('New game requested by:', player);
+    const existingGame = games.get(gameId);
     const game = {
       chess: new Chess(),
-      whitePlayer: null,
-      blackPlayer: null,
+      whitePlayer: existingGame?.whitePlayer || null,
+      blackPlayer: existingGame?.blackPlayer || null,
+      selectedColor: null
     };
     games.set(gameId, game);
 
     io.emit('game_update', {
       board: game.chess.fen(),
       turn: 'white',
-      whitePlayer: null,
-      blackPlayer: null,
+      whitePlayer: game.whitePlayer,
+      blackPlayer: game.blackPlayer,
       gameOver: false,
       winner: null,
       moveHistory: [],
+      currentPlayer: game.whitePlayer
     });
   });
 

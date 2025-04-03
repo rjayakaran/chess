@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 
-export const LoginComponent: React.FC = () => {
+export const LoginPage: React.FC = () => {
   const { authenticate, selectPlayer } = useGame();
+  const navigate = useNavigate();
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [selectedIdentity, setSelectedIdentity] = useState<string | null>(null);
@@ -25,16 +27,25 @@ export const LoginComponent: React.FC = () => {
   const handlePlayerSelect = async (identity: string) => {
     setSelectedIdentity(identity);
     if (identity === 'OJ' && preferredColor) {
-      await selectPlayer(identity as 'RJ' | 'OJ', preferredColor);
+      const success = await selectPlayer(identity as 'RJ' | 'OJ', preferredColor);
+      if (success) {
+        navigate('/game');
+      }
     } else if (identity === 'RJ') {
-      await selectPlayer(identity as 'RJ' | 'OJ');
+      const success = await selectPlayer(identity as 'RJ' | 'OJ');
+      if (success) {
+        navigate('/game');
+      }
     }
   };
 
   const handleColorSelect = async (color: 'white' | 'black') => {
     setPreferredColor(color);
     if (selectedIdentity === 'OJ') {
-      await selectPlayer('OJ', color);
+      const success = await selectPlayer('OJ', color);
+      if (success) {
+        navigate('/game');
+      }
     }
   };
 

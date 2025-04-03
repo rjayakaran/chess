@@ -1,14 +1,15 @@
 export type PlayerIdentity = 'RJ' | 'OJ';
 
-export interface GameState {
-  board: string; // FEN string
+export type GameState = {
+  board: string;
   turn: 'white' | 'black';
-  whitePlayer: PlayerIdentity | null;
-  blackPlayer: PlayerIdentity | null;
+  whitePlayer: string | null;
+  blackPlayer: string | null;
   gameOver: boolean;
-  winner: PlayerIdentity | null;
+  winner: string | null;
   moveHistory: string[];
-}
+  currentPlayer: string | null;
+};
 
 export interface Player {
   identity: PlayerIdentity;

@@ -12,11 +12,13 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@types/react-router-dom": "^5.3.3",
     "@types/socket.io-client": "^1.4.36",
     "chess.js": "^1.0.0-beta.4",
     "react": "^18.2.0",
     "react-chessboard": "^2.1.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^7.4.1",
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {

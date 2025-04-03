@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { GameContextType, GameState, Player, PlayerIdentity } from '../types/game';
-import { Socket, io } from 'socket.io-client';
+import { io, Socket as ClientSocket } from 'socket.io-client';
 
 const GameContext = createContext<GameContextType | null>(null);
 
@@ -14,11 +14,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     gameOver: false,
     winner: null,
     moveHistory: [],
+    currentPlayer: null
   });
 
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [socket, setSocket] = useState<ClientSocket | null>(null);
 
   const authenticate = useCallback(async (passcode: string) => {
     try {
@@ -43,10 +44,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.success) {
         setIsAuthenticated(true);
         const newSocket = io(
-          import.meta.env.VITE_API_URL || 'http://localhost:3001',
-          {
-            withCredentials: true
-          }
+          import.meta.env.VITE_API_URL || 'http://localhost:3001'
         );
         setSocket(newSocket);
       }
@@ -57,7 +55,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const selectPlayer = useCallback(async (identity: PlayerIdentity) => {
+  const selectPlayer = useCallback(async (identity: PlayerIdentity, preferredColor?: 'white' | 'black') => {
     if (!socket) return false;
     
     try {
@@ -69,7 +67,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
-          body: JSON.stringify({ identity }),
+          body: JSON.stringify({ identity, preferredColor }),
           credentials: 'include',
         }
       );
@@ -129,6 +127,29 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     socket.on('game_update', (newState: GameState) => {
       setGameState(newState);
+      
+      // Auto-switch to the next player
+      if (newState.currentPlayer && currentPlayer) {
+        const nextColor = newState.turn;
+        const nextIdentity = newState.currentPlayer;
+        
+        console.log('Game update received:', {
+          nextColor,
+          nextIdentity,
+          currentPlayer: currentPlayer.identity,
+          whitePlayer: newState.whitePlayer,
+          blackPlayer: newState.blackPlayer
+        });
+        
+        if (nextIdentity !== currentPlayer.identity) {
+          console.log('Switching to player:', nextIdentity, 'with color:', nextColor);
+          setCurrentPlayer({
+            identity: nextIdentity as PlayerIdentity,
+            color: nextColor,
+            token: 'dummy-token'
+          });
+        }
+      }
     });
 
     socket.on('game_over', (winner: PlayerIdentity) => {
@@ -143,7 +164,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off('game_update');
       socket.off('game_over');
     };
-  }, [socket]);
+  }, [socket, currentPlayer]);
 
   return (
     <GameContext.Provider
