@@ -264,24 +264,28 @@ const startServer = (port: number) => {
   }
 };
 
-// Handle process termination
+// Handle server shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+  console.log('Received SIGTERM. Shutting down gracefully...');
   if (serverInstance) {
     serverInstance.close(() => {
       console.log('Server closed');
       process.exit(0);
     });
+  } else {
+    process.exit(0);
   }
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully...');
+  console.log('Received SIGINT. Shutting down gracefully...');
   if (serverInstance) {
     serverInstance.close(() => {
       console.log('Server closed');
       process.exit(0);
     });
+  } else {
+    process.exit(0);
   }
 });
 
