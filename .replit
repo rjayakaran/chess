@@ -6,6 +6,7 @@ enabled = false
 
 [env]
 PATH = "/home/runner/.npm-global/bin:/home/runner/.local/bin:/home/runner/.cargo/bin:/home/runner/.config/yarn/global/node_modules/.bin:/home/runner/.nvm/versions/node/v18.18.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+NODE_ENV = "development"
 
 [packager]
 language = "nodejs"
@@ -16,5 +17,6 @@ guessImports = true
 enabledForHosting = false
 
 [deployment]
+build = ["npm", "install"]
 run = ["npm", "run", "build"]
 deploymentTarget = "cloudrun" 
