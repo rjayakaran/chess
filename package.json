@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "start": "concurrently \"npm run dev\" \"cd server && npm start\""
+    "start": "concurrently \"npm run preview\" \"cd server && npm start\""
   },
   "dependencies": {
     "chess.js": "^1.0.0-beta.5",

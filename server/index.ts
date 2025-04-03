@@ -8,6 +8,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Add root endpoint handler
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Chess server is running' });
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
