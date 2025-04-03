@@ -15,24 +15,18 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: |
-          npm install
-          cd server
-          npm install
+        run: npm install
 
-      - name: Build frontend
+      - name: Build
         run: npm run build
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          commit_message: "Deploy to GitHub Pages"
-          force: true
 
       - name: Start backend server
         run: |

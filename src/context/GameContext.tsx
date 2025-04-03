@@ -43,9 +43,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (data.success) {
         setIsAuthenticated(true);
-        const newSocket = io(
-          import.meta.env.VITE_API_URL || 'http://localhost:3001'
-        );
+        const newSocket = io(import.meta.env.VITE_SERVER_URL || 'http://localhost:3001', {
+          autoConnect: false
+        });
         setSocket(newSocket);
       }
       return data;

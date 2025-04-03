@@ -5,29 +5,21 @@ import { Chess } from 'chess.js';
 import cors from 'cors';
 
 const app = express();
+app.use(cors());
+app.use(express.json());
+
 const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // Allow all origins in development
+    methods: ["GET", "POST"]
+  }
+});
 
 // Get port from environment variable or use 3001 as default
 const PORT = parseInt(process.env.PORT || '3001', 10);
-
-// Configure CORS based on environment
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://rjayakaran.github.io'] // Your GitHub Pages URL
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Local development URLs
-  methods: ['GET', 'POST'],
-  credentials: true
-};
-
-const io = new Server(httpServer, {
-  cors: corsOptions
-});
-
-// Enable CORS for all routes
-app.use(cors(corsOptions));
-
-// Parse JSON bodies
-app.use(express.json());
+const MAX_PORT_ATTEMPTS = 10;
+let currentPort = PORT;
 
 // In-memory game state
 const games = new Map<string, {
@@ -239,8 +231,6 @@ io.on('connection', (socket) => {
 });
 
 // Start server with error handling
-let currentPort = PORT;
-const MAX_PORT_ATTEMPTS = 10;
 let serverInstance: ReturnType<typeof httpServer.listen> | null = null;
 
 const startServer = async (port: number) => {
