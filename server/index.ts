@@ -171,6 +171,10 @@ let currentPort = PORT;
 const MAX_PORT_ATTEMPTS = 10;
 
 const startServer = (port: number) => {
+  if (httpServer.listening) {
+    httpServer.close();
+  }
+  
   httpServer.listen(port, () => {
     console.log(`Server running on port ${port}`);
   }).on('error', (err: NodeJS.ErrnoException) => {
