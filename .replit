@@ -17,6 +17,6 @@ guessImports = true
 enabledForHosting = false
 
 [deployment]
-build = ["npm", "install", "-g", "concurrently"]
+build = ["npm", "install", "-g", "typescript", "ts-node", "@types/node", "concurrently"]
 run = ["npm", "run", "build"]
 deploymentTarget = "cloudrun" 
